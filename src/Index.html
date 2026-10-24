@@ -1,0 +1,18 @@
+<!DOCTYPE html>
+<html lang="th">
+  <head>
+    <meta charset="utf-8">
+    <base target="_top">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;600;700&display=swap" rel="stylesheet">
+    <?!= include('Styles') ?>
+  </head>
+  <body data-app-url="<?= appUrl ?>">
+    <header class="bar">
+      <button type="button" id="home" class="brand">ติดตามแผนจัดซื้อจัดจ้าง</button>
+      <select id="year" aria-label="ปีงบประมาณ"></select>
+    </header>
+    <main id="app"><p class="muted">กำลังโหลด…</p></main>
+    <?!= include('App') ?>
+  </body>
+</html>

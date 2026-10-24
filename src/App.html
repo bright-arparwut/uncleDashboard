@@ -1,0 +1,288 @@
+<script>
+  const APP_URL = document.body.dataset.appUrl;
+  const STEPS = [
+    'stepPlan', 'stepPublish', 'stepTor', 'stepMedianPrice', 'stepPurchaseReport', 'stepBidOpen',
+    'stepApprovalRequest', 'stepApproved', 'stepDisburse', 'stepCommit', 'deliveryDeadline', 'stepLedger',
+  ];
+  const CLASSIFICATION = ['type', 'plan', 'station', 'group', 'method', 'authority', 'kc'];
+  const LIST_COLUMNS = ['code', 'name', 'budget', 'status', 'station'];
+  const STATUS_COLORS = 8;
+  const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
+
+  const app = document.getElementById('app');
+  const yearSelect = document.getElementById('year');
+  const emptyFilters = () => ({ year: '', q: '', type: '', group: '', status: '', overdueOnly: false });
+  let state = { list: null, filters: emptyFilters() };
+
+  // ---- helpers ----
+
+  function call(fn, ...args) {
+    return new Promise((resolve, reject) =>
+      google.script.run.withSuccessHandler(resolve).withFailureHandler(reject)[fn](...args));
+  }
+
+  function esc(value) {
+    const map = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' };
+    return String(value ?? '').replace(/[&<>"']/g, c => map[c]);
+  }
+
+  const isBlank = v => v === null || v === undefined || v === '';
+  const isDate = v => typeof v === 'string' && ISO_DATE.test(v);
+  const thaiDate = iso => new Date(iso + 'T00:00:00')
+    .toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: 'numeric' });
+  const show = v => isBlank(v) ? '—' : esc(isDate(v) ? thaiDate(v) : v);
+
+  function toNumber(v) {
+    if (typeof v === 'number') return v;
+    const n = parseFloat(String(v ?? '').replace(/,/g, ''));
+    return isNaN(n) ? null : n;
+  }
+
+  function money(v) {
+    const n = toNumber(v);
+    return n === null ? show(v) : n.toLocaleString('th-TH', { maximumFractionDigits: 2 });
+  }
+
+  const millions = n => (n / 1e6).toLocaleString('th-TH', { maximumFractionDigits: 2 }) + ' ลบ.';
+
+  // Colour by hashing the status text, so a status keeps its colour on every page.
+  function statusBadge(status) {
+    if (isBlank(status)) return '';
+    const hash = [...String(status)].reduce((h, c) => (h * 31 + c.charCodeAt(0)) >>> 0, 0);
+    return `<span class="badge s${hash % STATUS_COLORS}">${esc(status)}</span>`;
+  }
+
+  const overdueBadge = item => item.isOverdue ? ' <span class="badge danger">เกินกำหนด</span>' : '';
+
+  function distinct(items, key) {
+    const values = items.map(i => i[key]).filter(v => !isBlank(v)).map(String);
+    return [...new Set(values)].sort((a, b) => a.localeCompare(b, 'th'));
+  }
+
+  function setView(html) {
+    app.innerHTML = html;
+    window.scrollTo(0, 0);
+  }
+
+  function fail(err) {
+    setView(`<div class="card error">
+      <p>โหลดข้อมูลไม่สำเร็จ</p>
+      <p class="muted">${esc((err && err.message) || err)}</p>
+      <p class="muted">หากไม่มีสิทธิ์ ให้ขอสิทธิ์ดูชีตจากผู้ดูแล</p>
+    </div>`);
+  }
+
+  // ---- routing (list: no params, detail: ?item=<Item Code>) ----
+
+  // Bumped on every navigation, so a slow response for a page the user already left is dropped.
+  let navigation = 0;
+
+  function route(params) {
+    const ticket = ++navigation;
+    const isCurrent = () => ticket === navigation;
+    const view = params.item ? showDetail(params.item, isCurrent) : showList(isCurrent);
+    return view.catch(err => { if (isCurrent()) fail(err); });
+  }
+
+  function go(params) {
+    google.script.history.push(null, params);
+    route(params);
+  }
+
+  // ---- list page ----
+
+  // The whole tab is loaded once; Fiscal Year is then just a filter, defaulting to the current one.
+  function setList(list) {
+    const items = [...list.items].sort((a, b) => a.code.localeCompare(b.code, 'th', { numeric: true }));
+    const years = [...new Set(items.map(i => i.fiscalYear).filter(Boolean))].sort((a, b) => b - a);
+    const year = years.includes(list.currentFiscalYear) ? list.currentFiscalYear : years[0];
+    state = { ...state, list: { ...list, items }, filters: { ...state.filters, year: year ? String(year) : '' } };
+    yearSelect.innerHTML = years.map(y => `<option value="${y}">ปีงบ ${y}</option>`).join('')
+      + '<option value="">ทุกปี</option>';
+    yearSelect.value = state.filters.year;
+  }
+
+  async function showList(isCurrent) {
+    if (!state.list) {
+      setView('<p class="muted">กำลังโหลด…</p>');
+      const list = await call('getList');
+      if (!isCurrent()) return;
+      setList(list);
+    }
+    renderListShell();
+    renderListBody();
+  }
+
+  function filterSelect(key, label, options, selected) {
+    const opts = options.map(o => `<option value="${esc(o)}"${o === selected ? ' selected' : ''}>${esc(o)}</option>`);
+    return `<select data-filter="${key}" aria-label="${esc(label)}"><option value="">${esc(label)}: ทั้งหมด</option>${opts.join('')}</select>`;
+  }
+
+  function renderListShell() {
+    const { items, labels } = state.list;
+    const f = state.filters;
+    setView(`
+      <div id="summary" class="cards"></div>
+      <div class="filters">
+        <input type="search" data-filter="q" placeholder="ค้นหารหัสหรือชื่อรายการ" value="${esc(f.q)}" aria-label="ค้นหา">
+        ${filterSelect('type', labels.type, distinct(items, 'type'), f.type)}
+        ${filterSelect('group', labels.group, distinct(items, 'group'), f.group)}
+        ${filterSelect('status', labels.status, distinct(items, 'status'), f.status)}
+      </div>
+      <p id="count" class="count muted"></p>
+      <div id="items" class="list"></div>`);
+
+    app.querySelectorAll('[data-filter]').forEach(input => {
+      input.addEventListener('input', () => setFilter(input.dataset.filter, input.value));
+    });
+    app.querySelector('#summary').addEventListener('click', e => {
+      if (e.target.closest('[data-overdue]')) setFilter('overdueOnly', !state.filters.overdueOnly);
+    });
+    app.querySelector('#items').addEventListener('click', e => {
+      const row = e.target.closest('[data-code]');
+      if (row) go({ item: row.dataset.code });
+    });
+  }
+
+  function setFilter(key, value) {
+    state = { ...state, filters: { ...state.filters, [key]: value } };
+    renderListBody();
+  }
+
+  function matches(item, f) {
+    const q = f.q.trim().toLowerCase();
+    const same = key => !f[key] || String(item[key] ?? '') === f[key];
+    return (!q || (item.code + ' ' + (item.name ?? '')).toLowerCase().includes(q))
+      && (!f.year || String(item.fiscalYear) === f.year)
+      && same('type') && same('group') && same('status')
+      && (!f.overdueOnly || item.isOverdue);
+  }
+
+  function renderListBody() {
+    const { items, labels, duplicateCodes } = state.list;
+    const f = state.filters;
+    const inYear = items.filter(item => !f.year || String(item.fiscalYear) === f.year);
+    const shown = items.filter(item => matches(item, f));
+    const budget = shown.reduce((sum, item) => sum + (toNumber(item.budget) || 0), 0);
+    const overdue = shown.filter(item => item.isOverdue).length;
+
+    app.querySelector('#summary').innerHTML = `
+      <div class="kpi"><span>จำนวนรายการ</span><strong>${shown.length.toLocaleString('th-TH')}</strong></div>
+      <div class="kpi"><span>วงเงินรวม</span><strong>${millions(budget)}</strong></div>
+      <div class="kpi"><span>อนุมัติแล้ว</span><strong>${shown.filter(i => i.isApproved).length.toLocaleString('th-TH')}</strong></div>
+      <button type="button" data-overdue class="kpi${overdue ? ' alert' : ''}${f.overdueOnly ? ' active' : ''}" aria-pressed="${f.overdueOnly}">
+        <span>เกินกำหนด${f.overdueOnly ? ' (แตะเพื่อดูทั้งหมด)' : ''}</span><strong>${overdue.toLocaleString('th-TH')}</strong>
+      </button>`;
+
+    app.querySelector('#count').textContent = `แสดง ${shown.length} จาก ${inYear.length} รายการ`;
+
+    const head = `<div class="row head">${LIST_COLUMNS.map(k => `<span>${esc(labels[k])}</span>`).join('')}</div>`;
+    const rows = shown.map(item => `
+      <button type="button" class="row" data-code="${esc(item.code)}">
+        <span class="code">${esc(item.code)}${duplicateCodes.includes(item.code) ? ' <span class="badge warn">รหัสซ้ำ</span>' : ''}</span>
+        <span class="name">${show(item.name)}</span>
+        <span class="budget">${money(item.budget)}</span>
+        <span>${statusBadge(item.status)}${overdueBadge(item)}</span>
+        <span class="station">${show(item.station)}</span>
+      </button>`);
+    app.querySelector('#items').innerHTML = shown.length ? head + rows.join('') : '<p class="muted">ไม่พบรายการ</p>';
+  }
+
+  // ---- detail page ----
+
+  // Shows the row already loaded with the list at once, then re-renders only if the fresh row differs.
+  async function showDetail(code, isCurrent) {
+    const list = state.list;
+    const cached = list && list.items.find(item => item.code === code);
+    if (cached) renderDetail({ labels: list.labels, item: cached, sheetUrl: list.sheetUrl });
+    else setView('<p class="muted">กำลังโหลด…</p>');
+
+    const result = await call('getItem', code);
+    if (!isCurrent()) return;
+    if (!result) {
+      setView(`<button type="button" class="link back" data-back>← กลับ</button>
+        <p class="card error">ไม่พบรายการรหัส ${esc(code)}</p>`);
+      bindBack();
+    } else if (!cached || JSON.stringify(result.item) !== JSON.stringify(cached)) {
+      renderDetail(result);
+    }
+  }
+
+  function bindBack() {
+    app.querySelector('[data-back]').addEventListener('click', () => go({}));
+  }
+
+  function moneyCard(labels, item) {
+    const budget = toNumber(item.budget);
+    const approved = toNumber(item.approvedAmount);
+    const savings = budget !== null && approved !== null ? budget - approved : null;
+    const percent = savings !== null && budget
+      ? ` (${(savings / budget * 100).toLocaleString('th-TH', { maximumFractionDigits: 1 })}%)` : '';
+    return `<section class="card money">
+      <div><span class="muted">${esc(labels.budget)}</span><strong>${money(item.budget)}</strong></div>
+      <div><span class="muted">${esc(labels.approvedAmount)}</span><strong>${money(item.approvedAmount)}</strong></div>
+      ${savings === null ? '' : `<div class="saving"><span class="muted">ประหยัด</span><strong>${money(savings)}${percent}</strong></div>`}
+    </section>`;
+  }
+
+  function stepItem(key, labels, item) {
+    const value = item[key];
+    if (key === 'deliveryDeadline') {
+      return `<li class="step deadline${item.isOverdue ? ' overdue' : ''}">
+        <span class="label">กำหนดส่งมอบ <small class="muted">(${esc(labels[key])})</small></span>
+        <span class="value">${show(value)}${item.isOverdue ? ' · เกินกำหนด' : ''}</span>
+      </li>`;
+    }
+    const kind = isDate(value) ? 'done' : isBlank(value) ? 'pending' : 'info';
+    return `<li class="step ${kind}">
+      <span class="label">${esc(labels[key])}</span>
+      <span class="value">${isBlank(value) ? 'ยังไม่ดำเนินการ' : show(value)}</span>
+    </li>`;
+  }
+
+  function renderDetail({ labels, item, sheetUrl }) {
+    // openExternalBrowser=1 makes LINE open the link in Chrome/Safari, where Google sign-in works.
+    const link = `${APP_URL}?item=${encodeURIComponent(item.code)}&openExternalBrowser=1`;
+    const year = item.fiscalYear ? ` · ปีงบ ${item.fiscalYear}` : '';
+    setView(`
+      <button type="button" class="link back" data-back>← กลับ</button>
+      <section class="card">
+        <p class="muted">${esc(labels.code)} ${esc(item.code)}${year}</p>
+        <h1>${show(item.name)}</h1>
+        <p>${statusBadge(item.status)}${overdueBadge(item)}</p>
+      </section>
+      ${moneyCard(labels, item)}
+      <section class="card">
+        <dl class="fields">${CLASSIFICATION.map(k => `<dt>${esc(labels[k])}</dt><dd>${show(item[k])}</dd>`).join('')}</dl>
+      </section>
+      <section class="card"><h2>${esc(labels.detail)}</h2><p class="prose">${show(item.detail)}</p></section>
+      <section class="card"><h2>ขั้นตอนการจัดหา</h2><ol class="steps">${STEPS.map(k => stepItem(k, labels, item)).join('')}</ol></section>
+      <section class="card"><h2>${esc(labels.note)}</h2><p class="prose">${show(item.note)}</p></section>
+      <section class="card actions">
+        <a class="btn" href="${esc(`${sheetUrl}&range=C${item.row}:AB${item.row}`)}" target="_blank" rel="noopener">เปิดใน Sheet</a>
+        <input id="share" readonly value="${esc(link)}" aria-label="ลิงก์ของรายการนี้">
+        <button type="button" class="btn" data-copy>คัดลอกลิงก์</button>
+      </section>`);
+
+    bindBack();
+    const copyButton = app.querySelector('[data-copy]');
+    copyButton.addEventListener('click', () => {
+      const share = app.querySelector('#share');
+      // Clipboard can be blocked inside the Apps Script iframe; fall back to selecting the text.
+      const copied = navigator.clipboard ? navigator.clipboard.writeText(link) : Promise.reject();
+      copied
+        .then(() => { copyButton.textContent = 'คัดลอกแล้ว'; })
+        .catch(() => { share.select(); copyButton.textContent = 'กดค้างที่ลิงก์เพื่อคัดลอก'; });
+    });
+  }
+
+  // ---- start ----
+
+  yearSelect.addEventListener('change', () => {
+    state = { ...state, filters: { ...state.filters, year: yearSelect.value } };
+    go({});
+  });
+  document.getElementById('home').addEventListener('click', () => go({}));
+  google.script.history.setChangeHandler(e => route(e.location.parameter));
+  google.script.url.getLocation(location => route(location.parameter));
+</script>
