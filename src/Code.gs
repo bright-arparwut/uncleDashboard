@@ -5,17 +5,17 @@
 const SHEET_NAME = 'รวมงบงานประจำปี 70';
 
 const HEADER_SEARCH_ROWS = 10; // the header row is found within the first rows of the tab
-const FIRST_COL = 2; // B
-const COL_COUNT = 27; // B..AB
+const FIRST_COL = 1; // A
+const COL_COUNT = 28; // A..AB
 const CODE_HEADER = 'รหัสรายการ';
 const NAME_HEADER = 'รายการ';
 const BUDDHIST_OFFSET = 543;
 const BUDDHIST_CENTURY = 2500; // Item Code "70…" is Fiscal Year 2570
 const FISCAL_YEAR_START_MONTH = 10; // October
 
-// One key per column, B..AB in order.
+// One key per column, A..AB in order.
 const FIELDS = [
-  'project', 'code', 'type', 'plan', 'station', 'group', 'name', 'budget', 'status', 'detail',
+  'unit', 'project', 'code', 'type', 'plan', 'station', 'group', 'name', 'budget', 'status', 'detail',
   'approvedAmount', 'method', 'authority', 'kc',
   'stepPlan', 'stepPublish', 'stepTor', 'stepMedianPrice', 'stepPurchaseReport', 'stepBidOpen',
   'stepApprovalRequest', 'stepApproved', 'stepDisburse', 'stepCommit', 'deliveryDeadline', 'stepLedger',

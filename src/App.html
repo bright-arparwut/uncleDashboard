@@ -4,7 +4,7 @@
     'kc', 'stepPlan', 'stepPublish', 'stepTor', 'stepMedianPrice', 'stepPurchaseReport', 'stepBidOpen',
     'stepApprovalRequest', 'stepApproved', 'stepDisburse', 'stepCommit', 'deliveryDeadline', 'stepLedger',
   ];
-  const CLASSIFICATION = ['project', 'type', 'plan', 'station', 'group', 'method', 'authority'];
+  const CLASSIFICATION = ['unit', 'project', 'type', 'plan', 'station', 'group', 'method', 'authority'];
   const LIST_COLUMNS = ['code', 'name', 'budget', 'status', 'station'];
   const STATUS_COLORS = 8;
   // Light to dark along the process, so the Stage order reads at a glance.
@@ -13,7 +13,7 @@
 
   const app = document.getElementById('app');
   const yearSelect = document.getElementById('year');
-  const emptyFilters = () => ({ year: '', q: '', project: '', type: '', group: '', status: '', stage: '', overdueOnly: false });
+  const emptyFilters = () => ({ year: '', q: '', unit: '', project: '', type: '', group: '', status: '', stage: '', overdueOnly: false });
   let state = { list: null, filters: emptyFilters() };
 
   // ---- helpers ----
@@ -128,6 +128,7 @@
       <section id="stages" class="card stages" aria-label="ขั้นตอนปัจจุบัน"></section>
       <div class="filters">
         <input type="search" data-filter="q" placeholder="ค้นหารหัสหรือชื่อรายการ" value="${esc(f.q)}" aria-label="ค้นหา">
+        ${filterSelect('unit', labels.unit, distinct(items, 'unit'), f.unit)}
         ${filterSelect('project', labels.project, distinct(items, 'project'), f.project)}
         ${filterSelect('type', labels.type, distinct(items, 'type'), f.type)}
         ${filterSelect('group', labels.group, distinct(items, 'group'), f.group)}
@@ -162,7 +163,7 @@
     const same = key => !f[key] || String(item[key] ?? '') === f[key];
     return (!q || (item.code + ' ' + (item.name ?? '')).toLowerCase().includes(q))
       && (!f.year || String(item.fiscalYear) === f.year)
-      && same('project') && same('type') && same('group') && same('status') && same('stage')
+      && same('unit') && same('project') && same('type') && same('group') && same('status') && same('stage')
       && (!f.overdueOnly || item.isOverdue);
   }
 
@@ -303,7 +304,7 @@
       <section class="card"><h2>ขั้นตอนการจัดหา</h2><ol class="steps">${STEPS.map(k => stepItem(k, labels, item)).join('')}</ol></section>
       <section class="card"><h2>${esc(labels.note)}</h2><p class="prose">${show(item.note)}</p></section>
       <section class="card actions">
-        <a class="btn" href="${esc(`${sheetUrl}&range=B${item.row}:AB${item.row}`)}" target="_blank" rel="noopener">เปิดใน Sheet</a>
+        <a class="btn" href="${esc(`${sheetUrl}&range=A${item.row}:AB${item.row}`)}" target="_blank" rel="noopener">เปิดใน Sheet</a>
         <input id="share" readonly value="${esc(link)}" aria-label="ลิงก์ของรายการนี้">
         <button type="button" class="btn" data-copy>คัดลอกลิงก์</button>
       </section>`);

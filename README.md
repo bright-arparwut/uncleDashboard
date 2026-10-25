@@ -25,7 +25,7 @@ First visit shows a Google consent screen ("view and manage spreadsheets this ap
 ## Sheet requirements
 
 - All data is in one tab, named in `SHEET_NAME` at the top of `Code.gs` (currently `รวมงบงานประจำปี 70`). If the tab is renamed, update it and deploy a new version.
-- The header row (`รหัสรายการ` in column C, `รายการ` in column H) must be within the first 10 rows; data starts on the next row, columns B..AB.
+- The header row (`รหัสรายการ` in column C, `รายการ` in column H) must be within the first 10 rows; data starts on the next row, columns A..AB.
 - Each Item Code starts with its 2-digit Fiscal Year (`70SA0010` → 2570); the year dropdown filters on that.
 
 ## Sharing links in LINE

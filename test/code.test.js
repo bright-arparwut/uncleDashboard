@@ -10,21 +10,22 @@ const source = fs.readFileSync(path.join(__dirname, '../src/Code.gs'), 'utf8');
 const gs = vm.runInNewContext(source + `
 ;({ fiscalYearFromCode, isHeaderRow, currentFiscalYear, parseTextDate, toCell, toRecord, findDuplicateCodes, labelsFrom, FIELDS })`, { Date }); // share Date so instanceof works
 
-const blankRow = () => Array(27).fill('');
+const blankRow = () => Array(28).fill('');
 const col = letter => gs.FIELDS.indexOf(letter);
 
-test('FIELDS covers columns B..AB', () => {
-  assert.strictEqual(gs.FIELDS.length, 27);
-  assert.strictEqual(col('project'), 0); // B
-  assert.strictEqual(col('code'), 1); // C
-  assert.strictEqual(col('name'), 6); // H
-  assert.strictEqual(col('stepApproved'), 21); // W
-  assert.strictEqual(col('deliveryDeadline'), 24); // Z
-  assert.strictEqual(col('note'), 26); // AB
+test('FIELDS covers columns A..AB', () => {
+  assert.strictEqual(gs.FIELDS.length, 28);
+  assert.strictEqual(col('unit'), 0); // A
+  assert.strictEqual(col('project'), 1); // B
+  assert.strictEqual(col('code'), 2); // C
+  assert.strictEqual(col('name'), 7); // H
+  assert.strictEqual(col('stepApproved'), 22); // W
+  assert.strictEqual(col('deliveryDeadline'), 25); // Z
+  assert.strictEqual(col('note'), 27); // AB
 });
 
-// Columns B..AB of the header row in the real 'รวมงบงานประจำปี 70' tab.
-const REAL_HEADER = ['กลุ่มงาน/โครงการ', 'รหัสรายการ', 'ประเภทงาน', 'แผนงาน', 'สถาน คฉ.', 'กลุ่มงาน (หัวข้อหลัก-ย่อย)', 'รายการ',
+// Columns A..AB of the header row in the real 'รวมงบงานประจำปี 70' tab.
+const REAL_HEADER = ['หน่วย', 'กลุ่มงาน/โครงการ', 'รหัสรายการ', 'ประเภทงาน', 'แผนงาน', 'สถาน คฉ.', 'กลุ่มงาน (หัวข้อหลัก-ย่อย)', 'รายการ',
   'วงเงิน', 'สถานะ', 'รายละเอียด (สรุปการดำเนินการ)', 'วงเงินอนุมัติซื้อ/จ้าง', 'วีธีจัดหา', 'อำนาจอนุมัติ', 'คฉ.',
   'แผนจัดหา', 'เผยแพร่แผน', 'TOR', 'ราคากลาง', 'รายงานขอซื้อ', 'วันที่เปิดซอง', 'ขออนุมัติ ซื้อ/จ้าง',
   'อนุมัติ ซื้อ/จ้าง', 'สั่งจ่าย งป.', 'ผูกพัน', 'ส่งมอบภายใน', 'ขึ้นบัญชีคุม', 'หมายเหตุ'];
@@ -33,6 +34,7 @@ test('header row is recognised and every field gets its real label', () => {
   assert.ok(gs.isHeaderRow(REAL_HEADER));
   assert.ok(!gs.isHeaderRow(blankRow()));
   const labels = gs.labelsFrom(REAL_HEADER);
+  assert.strictEqual(labels.unit, 'หน่วย');
   assert.strictEqual(labels.project, 'กลุ่มงาน/โครงการ');
   assert.strictEqual(labels.name, 'รายการ');
   assert.strictEqual(labels.stepApproved, 'อนุมัติ ซื้อ/จ้าง');
