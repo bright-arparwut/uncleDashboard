@@ -10,19 +10,21 @@ const source = fs.readFileSync(path.join(__dirname, '../src/Code.gs'), 'utf8');
 const gs = vm.runInNewContext(source + `
 ;({ fiscalYearFromCode, isHeaderRow, currentFiscalYear, parseTextDate, toCell, toRecord, findDuplicateCodes, labelsFrom, FIELDS })`, { Date }); // share Date so instanceof works
 
-const blankRow = () => Array(26).fill('');
+const blankRow = () => Array(27).fill('');
 const col = letter => gs.FIELDS.indexOf(letter);
 
-test('FIELDS covers columns C..AB', () => {
-  assert.strictEqual(gs.FIELDS.length, 26);
-  assert.strictEqual(col('name'), 5); // H
-  assert.strictEqual(col('stepApproved'), 20); // W
-  assert.strictEqual(col('deliveryDeadline'), 23); // Z
-  assert.strictEqual(col('note'), 25); // AB
+test('FIELDS covers columns B..AB', () => {
+  assert.strictEqual(gs.FIELDS.length, 27);
+  assert.strictEqual(col('project'), 0); // B
+  assert.strictEqual(col('code'), 1); // C
+  assert.strictEqual(col('name'), 6); // H
+  assert.strictEqual(col('stepApproved'), 21); // W
+  assert.strictEqual(col('deliveryDeadline'), 24); // Z
+  assert.strictEqual(col('note'), 26); // AB
 });
 
-// Columns C..AB of the header row in the real 'รวมงบงานประจำปี 70' tab.
-const REAL_HEADER = ['รหัสรายการ', 'ประเภทงาน', 'แผนงาน', 'สถาน คฉ.', 'กลุ่มงาน (หัวข้อหลัก-ย่อย)', 'รายการ',
+// Columns B..AB of the header row in the real 'รวมงบงานประจำปี 70' tab.
+const REAL_HEADER = ['กลุ่มงาน/โครงการ', 'รหัสรายการ', 'ประเภทงาน', 'แผนงาน', 'สถาน คฉ.', 'กลุ่มงาน (หัวข้อหลัก-ย่อย)', 'รายการ',
   'วงเงิน', 'สถานะ', 'รายละเอียด (สรุปการดำเนินการ)', 'วงเงินอนุมัติซื้อ/จ้าง', 'วีธีจัดหา', 'อำนาจอนุมัติ', 'คฉ.',
   'แผนจัดหา', 'เผยแพร่แผน', 'TOR', 'ราคากลาง', 'รายงานขอซื้อ', 'วันที่เปิดซอง', 'ขออนุมัติ ซื้อ/จ้าง',
   'อนุมัติ ซื้อ/จ้าง', 'สั่งจ่าย งป.', 'ผูกพัน', 'ส่งมอบภายใน', 'ขึ้นบัญชีคุม', 'หมายเหตุ'];
@@ -31,6 +33,7 @@ test('header row is recognised and every field gets its real label', () => {
   assert.ok(gs.isHeaderRow(REAL_HEADER));
   assert.ok(!gs.isHeaderRow(blankRow()));
   const labels = gs.labelsFrom(REAL_HEADER);
+  assert.strictEqual(labels.project, 'กลุ่มงาน/โครงการ');
   assert.strictEqual(labels.name, 'รายการ');
   assert.strictEqual(labels.stepApproved, 'อนุมัติ ซื้อ/จ้าง');
   assert.strictEqual(labels.deliveryDeadline, 'ส่งมอบภายใน');
@@ -67,8 +70,8 @@ test('cells: blanks become null, Date objects become ISO, BE-year Dates are corr
 
 test('record flags: approved needs a W date; overdue needs a past Z date and empty AA', () => {
   const cells = blankRow();
-  cells[0] = '70SA0010';
-  cells[5] = 'จ้างซ่อม';
+  cells[col('code')] = '70SA0010';
+  cells[col('name')] = 'จ้างซ่อม';
   cells[col('stepApproved')] = new Date(2025, 0, 10);
   cells[col('deliveryDeadline')] = '30/09/2568';
 
@@ -88,6 +91,22 @@ test('record flags: approved needs a W date; overdue needs a past Z date and emp
   const daysText = [...cells];
   daysText[col('deliveryDeadline')] = '90 วัน';
   assert.ok(!gs.toRecord(daysText, 7, '2030-01-01').isOverdue);
+});
+
+test('Stage is the step after the furthest dated one, ending at ขึ้นบัญชีคุม', () => {
+  const stageWith = dates => {
+    const cells = blankRow();
+    cells[col('code')] = '70SA0010';
+    Object.entries(dates).forEach(([key, value]) => { cells[col(key)] = value; });
+    return gs.toRecord(cells, 7, '2025-10-01').stage;
+  };
+  assert.strictEqual(stageWith({}), 'kc', 'no dates: still writing the spec');
+  assert.strictEqual(stageWith({ kc: new Date(2025, 0, 1) }), 'stepPlan');
+  assert.strictEqual(stageWith({ kc: '01/02/2568', stepPlan: '05/02/2568' }), 'stepApproved');
+  assert.strictEqual(stageWith({ kc: new Date(2025, 0, 1), stepApproved: new Date(2025, 2, 1) }), 'stepCommit', 'gap: furthest date wins');
+  assert.strictEqual(stageWith({ stepCommit: new Date(2025, 3, 1) }), 'stepLedger');
+  assert.strictEqual(stageWith({ stepLedger: new Date(2025, 4, 1) }), 'stepLedger', 'completed stays in ขึ้นบัญชีคุม');
+  assert.strictEqual(stageWith({ kc: 'รอ', stepPlan: '-' }), 'kc', 'text is not a date');
 });
 
 test('duplicate Item Codes are reported once each', () => {

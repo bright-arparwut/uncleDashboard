@@ -32,6 +32,10 @@ The current state of a Procurement Item, chosen from a fixed set maintained in t
 One stage of the procurement process (แผนจัดหา through ขึ้นบัญชีคุม); a Procurement Item has reached a step when that step's date is filled in.
 _Avoid_: Milestone, phase
 
+**Stage**:
+The step a Procurement Item is currently working on, out of คฉ. (คุณลักษณะเฉพาะ, writing the spec) → แผนจัดหา → อนุมัติ ซื้อ/จ้าง → ผูกพัน → ขึ้นบัญชีคุม. A date in one of these columns means that step is finished (any other text counts as empty), so the Stage is the step after the furthest dated one, even if an earlier date is empty; an item with no dates is in คฉ., and an item with a ขึ้นบัญชีคุม date stays in ขึ้นบัญชีคุม. Distinct from Status, which is maintained by hand in the sheet.
+_Avoid_: Status, progress
+
 **Delivery Deadline** (ส่งมอบภายใน):
 The date by which a Procurement Item must be delivered; it is a due date, not a completed Procurement Step.
 _Avoid_: Delivery date

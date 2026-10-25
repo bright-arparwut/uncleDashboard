@@ -1,17 +1,19 @@
 <script>
   const APP_URL = document.body.dataset.appUrl;
   const STEPS = [
-    'stepPlan', 'stepPublish', 'stepTor', 'stepMedianPrice', 'stepPurchaseReport', 'stepBidOpen',
+    'kc', 'stepPlan', 'stepPublish', 'stepTor', 'stepMedianPrice', 'stepPurchaseReport', 'stepBidOpen',
     'stepApprovalRequest', 'stepApproved', 'stepDisburse', 'stepCommit', 'deliveryDeadline', 'stepLedger',
   ];
-  const CLASSIFICATION = ['type', 'plan', 'station', 'group', 'method', 'authority', 'kc'];
+  const CLASSIFICATION = ['project', 'type', 'plan', 'station', 'group', 'method', 'authority'];
   const LIST_COLUMNS = ['code', 'name', 'budget', 'status', 'station'];
   const STATUS_COLORS = 8;
+  // Light to dark along the process, so the Stage order reads at a glance.
+  const STAGE_COLORS = ['#a9c4eb', '#6f9fdd', '#3f7fcf', '#1f5fbf', '#123a75'];
   const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 
   const app = document.getElementById('app');
   const yearSelect = document.getElementById('year');
-  const emptyFilters = () => ({ year: '', q: '', type: '', group: '', status: '', overdueOnly: false });
+  const emptyFilters = () => ({ year: '', q: '', project: '', type: '', group: '', status: '', stage: '', overdueOnly: false });
   let state = { list: null, filters: emptyFilters() };
 
   // ---- helpers ----
@@ -123,8 +125,10 @@
     const f = state.filters;
     setView(`
       <div id="summary" class="cards"></div>
+      <section id="stages" class="card stages" aria-label="ขั้นตอนปัจจุบัน"></section>
       <div class="filters">
         <input type="search" data-filter="q" placeholder="ค้นหารหัสหรือชื่อรายการ" value="${esc(f.q)}" aria-label="ค้นหา">
+        ${filterSelect('project', labels.project, distinct(items, 'project'), f.project)}
         ${filterSelect('type', labels.type, distinct(items, 'type'), f.type)}
         ${filterSelect('group', labels.group, distinct(items, 'group'), f.group)}
         ${filterSelect('status', labels.status, distinct(items, 'status'), f.status)}
@@ -137,6 +141,10 @@
     });
     app.querySelector('#summary').addEventListener('click', e => {
       if (e.target.closest('[data-overdue]')) setFilter('overdueOnly', !state.filters.overdueOnly);
+    });
+    app.querySelector('#stages').addEventListener('click', e => {
+      const slice = e.target.closest('[data-stage]');
+      if (slice) setFilter('stage', state.filters.stage === slice.dataset.stage ? '' : slice.dataset.stage);
     });
     app.querySelector('#items').addEventListener('click', e => {
       const row = e.target.closest('[data-code]');
@@ -154,7 +162,7 @@
     const same = key => !f[key] || String(item[key] ?? '') === f[key];
     return (!q || (item.code + ' ' + (item.name ?? '')).toLowerCase().includes(q))
       && (!f.year || String(item.fiscalYear) === f.year)
-      && same('type') && same('group') && same('status')
+      && same('project') && same('type') && same('group') && same('status') && same('stage')
       && (!f.overdueOnly || item.isOverdue);
   }
 
@@ -174,6 +182,9 @@
         <span>เกินกำหนด${f.overdueOnly ? ' (แตะเพื่อดูทั้งหมด)' : ''}</span><strong>${overdue.toLocaleString('th-TH')}</strong>
       </button>`;
 
+    // The chart ignores its own Stage filter, so the other slices stay visible around the selected one.
+    app.querySelector('#stages').innerHTML = stageChart(items.filter(item => matches(item, { ...f, stage: '' })));
+
     app.querySelector('#count').textContent = `แสดง ${shown.length} จาก ${inYear.length} รายการ`;
 
     const head = `<div class="row head">${LIST_COLUMNS.map(k => `<span>${esc(labels[k])}</span>`).join('')}</div>`;
@@ -186,6 +197,39 @@
         <span class="station">${show(item.station)}</span>
       </button>`);
     app.querySelector('#items').innerHTML = shown.length ? head + rows.join('') : '<p class="muted">ไม่พบรายการ</p>';
+  }
+
+  // Donut of stroked circles: circumference 100, so each dash length is the slice's percent.
+  function stageChart(items) {
+    const { stages, labels } = state.list;
+    const selected = state.filters.stage;
+    const total = items.length;
+    const counts = stages.map(key => items.filter(item => item.stage === key).length);
+    const percent = n => total ? n / total * 100 : 0;
+    const dim = key => selected && selected !== key ? ' dim' : '';
+    let start = 0;
+    const slices = stages.map((key, i) => {
+      const size = percent(counts[i]);
+      const offset = 25 - start; // start at 12 o'clock
+      start += size;
+      return size ? `<circle class="slice${dim(key)}" data-stage="${key}" r="15.915" cx="21" cy="21" stroke="${STAGE_COLORS[i]}"
+        stroke-dasharray="${size} ${100 - size}" stroke-dashoffset="${offset}"><title>${esc(labels[key])}: ${counts[i]}</title></circle>` : '';
+    });
+    const legend = stages.map((key, i) => `
+      <button type="button" class="legend${dim(key)}" data-stage="${key}" aria-pressed="${selected === key}">
+        <i style="background:${STAGE_COLORS[i]}"></i><span>${esc(labels[key])}</span>
+        <strong>${counts[i].toLocaleString('th-TH')}</strong>
+        <small class="muted">${Math.round(percent(counts[i]))}%</small>
+      </button>`);
+    return `<h2>ขั้นตอนปัจจุบัน</h2>
+      <div class="stage-body">
+        <svg viewBox="0 0 42 42" class="donut" role="img" aria-label="จำนวนรายการตามขั้นตอนปัจจุบัน">
+          <circle r="15.915" cx="21" cy="21" class="ring"></circle>${slices.join('')}
+          <text x="21" y="21" class="total">${total.toLocaleString('th-TH')}</text>
+          <text x="21" y="26.5" class="total-label">รายการ</text>
+        </svg>
+        <div class="legends">${legend.join('')}</div>
+      </div>`;
   }
 
   // ---- detail page ----
@@ -259,7 +303,7 @@
       <section class="card"><h2>ขั้นตอนการจัดหา</h2><ol class="steps">${STEPS.map(k => stepItem(k, labels, item)).join('')}</ol></section>
       <section class="card"><h2>${esc(labels.note)}</h2><p class="prose">${show(item.note)}</p></section>
       <section class="card actions">
-        <a class="btn" href="${esc(`${sheetUrl}&range=C${item.row}:AB${item.row}`)}" target="_blank" rel="noopener">เปิดใน Sheet</a>
+        <a class="btn" href="${esc(`${sheetUrl}&range=B${item.row}:AB${item.row}`)}" target="_blank" rel="noopener">เปิดใน Sheet</a>
         <input id="share" readonly value="${esc(link)}" aria-label="ลิงก์ของรายการนี้">
         <button type="button" class="btn" data-copy>คัดลอกลิงก์</button>
       </section>`);

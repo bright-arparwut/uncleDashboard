@@ -5,22 +5,28 @@
 const SHEET_NAME = 'รวมงบงานประจำปี 70';
 
 const HEADER_SEARCH_ROWS = 10; // the header row is found within the first rows of the tab
-const FIRST_COL = 3; // C
-const COL_COUNT = 26; // C..AB
+const FIRST_COL = 2; // B
+const COL_COUNT = 27; // B..AB
 const CODE_HEADER = 'รหัสรายการ';
 const NAME_HEADER = 'รายการ';
 const BUDDHIST_OFFSET = 543;
 const BUDDHIST_CENTURY = 2500; // Item Code "70…" is Fiscal Year 2570
 const FISCAL_YEAR_START_MONTH = 10; // October
 
-// One key per column, C..AB in order.
+// One key per column, B..AB in order.
 const FIELDS = [
-  'code', 'type', 'plan', 'station', 'group', 'name', 'budget', 'status', 'detail',
+  'project', 'code', 'type', 'plan', 'station', 'group', 'name', 'budget', 'status', 'detail',
   'approvedAmount', 'method', 'authority', 'kc',
   'stepPlan', 'stepPublish', 'stepTor', 'stepMedianPrice', 'stepPurchaseReport', 'stepBidOpen',
   'stepApprovalRequest', 'stepApproved', 'stepDisburse', 'stepCommit', 'deliveryDeadline', 'stepLedger',
   'note',
 ];
+
+const CODE_INDEX = FIELDS.indexOf('code');
+const NAME_INDEX = FIELDS.indexOf('name');
+
+// Stage columns in process order (see Stage in CONTEXT.md).
+const STAGES = ['kc', 'stepPlan', 'stepApproved', 'stepCommit', 'stepLedger'];
 
 function doGet() {
   const page = HtmlService.createTemplateFromFile('Index');
@@ -44,6 +50,7 @@ function getList() {
     sheetUrl: sheetUrl_(tab.sheet),
     items: records,
     duplicateCodes: findDuplicateCodes(records),
+    stages: STAGES,
     currentFiscalYear: currentFiscalYear(new Date()),
   };
 }
@@ -53,15 +60,14 @@ function getItem(code) {
   const tab = openSheet_();
   const lastRow = tab.sheet.getLastRow();
   if (lastRow < tab.firstDataRow) return null;
-  const found = tab.sheet.getRange(tab.firstDataRow, FIRST_COL, lastRow - tab.firstDataRow + 1, 1)
+  const found = tab.sheet.getRange(tab.firstDataRow, FIRST_COL + CODE_INDEX, lastRow - tab.firstDataRow + 1, 1)
     .createTextFinder(String(code).trim())
     .matchEntireCell(true)
     .findNext();
   if (!found) return null;
   const row = found.getRow();
   const range = tab.sheet.getRange(row, FIRST_COL, 1, COL_COUNT);
-  const cells = range.getValues()[0];
-  const item = toRecord([range.getDisplayValues()[0][0], ...cells.slice(1)], row, toIsoDate(new Date()));
+  const item = toRecord(withDisplayCode(range.getValues()[0], range.getDisplayValues()[0][CODE_INDEX]), row, toIsoDate(new Date()));
   return { labels: tab.labels, item, sheetUrl: sheetUrl_(tab.sheet) };
 }
 
@@ -87,18 +93,22 @@ function readRecords_(tab) {
   if (lastRow < tab.firstDataRow) return [];
   const range = tab.sheet.getRange(tab.firstDataRow, FIRST_COL, lastRow - tab.firstDataRow + 1, COL_COUNT);
   const rows = range.getValues();
-  // Item Code as displayed, so a code formatted "001" is not read as 1.
-  const codes = range.offset(0, 0, rows.length, 1).getDisplayValues();
+  const codes = range.offset(0, CODE_INDEX, rows.length, 1).getDisplayValues();
   const today = toIsoDate(new Date());
   return rows
-    .map((cells, i) => toRecord([codes[i][0], ...cells.slice(1)], tab.firstDataRow + i, today))
+    .map((cells, i) => toRecord(withDisplayCode(cells, codes[i][0]), tab.firstDataRow + i, today))
     .filter(r => r.code || r.name); // trailing formatted-but-empty rows
 }
 
 // ---- Pure helpers (covered by test/code.test.js) ----
 
 function isHeaderRow(header) {
-  return String(header[0]).trim() === CODE_HEADER && String(header[5]).trim() === NAME_HEADER;
+  return String(header[CODE_INDEX]).trim() === CODE_HEADER && String(header[NAME_INDEX]).trim() === NAME_HEADER;
+}
+
+// Item Code as displayed, so a code formatted "001" is not read as 1.
+function withDisplayCode(cells, displayCode) {
+  return cells.map((cell, i) => i === CODE_INDEX ? displayCode : cell);
 }
 
 function fiscalYearFromCode(code) {
@@ -161,7 +171,14 @@ function toRecord(cells, row, todayIso) {
     fiscalYear: fiscalYearFromCode(code),
     isApproved: isIsoDate(record.stepApproved),
     isOverdue: isIsoDate(record.deliveryDeadline) && record.deliveryDeadline < todayIso && record.stepLedger === null,
+    stage: stageOf(record),
   };
+}
+
+// A date means that step is finished, so the Stage is the step after the furthest dated one.
+function stageOf(record) {
+  const lastDone = STAGES.map(key => isIsoDate(record[key])).lastIndexOf(true);
+  return STAGES[Math.min(lastDone + 1, STAGES.length - 1)];
 }
 
 function findDuplicateCodes(records) {
