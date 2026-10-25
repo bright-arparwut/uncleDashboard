@@ -28,6 +28,8 @@
   .donut circle { fill: none; stroke-width: 7; }
   .donut .ring { stroke: var(--line); }
   .donut .slice { cursor: pointer; transition: opacity .15s; }
+  .donut .slice-label { font-size: 3px; font-weight: 700; text-anchor: middle; dominant-baseline: central; fill: #fff; pointer-events: none; }
+  .donut .slice-label.on-light { fill: var(--text); }
   .donut .total { font-size: 8px; font-weight: 700; text-anchor: middle; fill: var(--text); }
   .donut .total-label { font-size: 3.5px; text-anchor: middle; fill: var(--muted); }
   .legends { display: grid; gap: 4px; }

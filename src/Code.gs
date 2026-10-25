@@ -27,6 +27,7 @@ const NAME_INDEX = FIELDS.indexOf('name');
 
 // Stage columns in process order (see Stage in CONTEXT.md).
 const STAGES = ['kc', 'stepPlan', 'stepApproved', 'stepCommit', 'stepLedger'];
+const STAGE_DONE = 'done'; // every Stage column finished
 
 function doGet() {
   const page = HtmlService.createTemplateFromFile('Index');
@@ -50,7 +51,7 @@ function getList() {
     sheetUrl: sheetUrl_(tab.sheet),
     items: records,
     duplicateCodes: findDuplicateCodes(records),
-    stages: STAGES,
+    stages: [...STAGES, STAGE_DONE],
     currentFiscalYear: currentFiscalYear(new Date()),
   };
 }
@@ -178,7 +179,7 @@ function toRecord(cells, row, todayIso) {
 // A date means that step is finished, so the Stage is the step after the furthest dated one.
 function stageOf(record) {
   const lastDone = STAGES.map(key => isIsoDate(record[key])).lastIndexOf(true);
-  return STAGES[Math.min(lastDone + 1, STAGES.length - 1)];
+  return lastDone === STAGES.length - 1 ? STAGE_DONE : STAGES[lastDone + 1];
 }
 
 function findDuplicateCodes(records) {

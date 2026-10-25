@@ -10,10 +10,11 @@ const PORT = 8080;
 const SRC = path.join(__dirname, '../src');
 const read = name => fs.readFileSync(path.join(SRC, name), 'utf8');
 
+// Stage headers as the real sheet shows them: a merged group title over คฉ., blanks elsewhere.
 const HEADER = ['หน่วย', 'กลุ่มงาน/โครงการ', 'รหัสรายการ', 'ประเภทงาน', 'แผนงาน', 'สถาน คฉ.', 'กลุ่มงาน (หัวข้อหลัก-ย่อย)', 'รายการ',
-  'วงเงิน', 'สถานะ', 'รายละเอียด (สรุปการดำเนินการ)', 'วงเงินอนุมัติซื้อ/จ้าง', 'วีธีจัดหา', 'อำนาจอนุมัติ', 'คฉ.',
-  'แผนจัดหา', 'เผยแพร่แผน', 'TOR', 'ราคากลาง', 'รายงานขอซื้อ', 'วันที่เปิดซอง', 'ขออนุมัติ ซื้อ/จ้าง',
-  'อนุมัติ ซื้อ/จ้าง', 'สั่งจ่าย งป.', 'ผูกพัน', 'ส่งมอบภายใน', 'ขึ้นบัญชีคุม', 'หมายเหตุ'];
+  'วงเงิน', 'สถานะ', 'รายละเอียด (สรุปการดำเนินการ)', 'วงเงินอนุมัติซื้อ/จ้าง', 'วีธีจัดหา', 'อำนาจอนุมัติ', 'ดำเนินการจัดทำแผน',
+  '', 'เผยแพร่แผน', 'TOR', 'ราคากลาง', 'รายงานขอซื้อ', 'วันที่เปิดซอง', 'ขออนุมัติ ซื้อ/จ้าง',
+  '', 'สั่งจ่าย งป.', '', 'ส่งมอบภายใน', 'ขึ้นบัญชีคุม', 'หมายเหตุ'];
 
 // [name, budget, status, { field: date text (Buddhist era) }]
 const MOCK = [
@@ -30,7 +31,7 @@ const MOCK = [
 ];
 
 function mockList() {
-  const gs = vm.runInNewContext(read('Code.gs') + ';({ FIELDS, STAGES, toRecord, toIsoDate, labelsFrom, currentFiscalYear })', { Date });
+  const gs = vm.runInNewContext(read('Code.gs') + ';({ FIELDS, STAGES, STAGE_DONE, toRecord, toIsoDate, labelsFrom, currentFiscalYear })', { Date });
   const today = gs.toIsoDate(new Date());
   const items = MOCK.map(([name, budget, status, dates], i) => {
     const cells = Array(gs.FIELDS.length).fill('');
@@ -51,7 +52,7 @@ function mockList() {
     sheetUrl: 'https://docs.google.com/spreadsheets/d/mock/edit',
     items,
     duplicateCodes: [],
-    stages: [...gs.STAGES],
+    stages: [...gs.STAGES, gs.STAGE_DONE],
     currentFiscalYear: gs.currentFiscalYear(new Date()),
   };
 }

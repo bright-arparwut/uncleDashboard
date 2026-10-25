@@ -8,7 +8,20 @@
   const LIST_COLUMNS = ['code', 'name', 'budget', 'status', 'station'];
   const STATUS_COLORS = 8;
   // Light to dark along the process, so the Stage order reads at a glance.
-  const STAGE_COLORS = ['#a9c4eb', '#6f9fdd', '#3f7fcf', '#1f5fbf', '#123a75'];
+  // Light to dark blue while in progress, green once done.
+  const STAGE_COLORS = ['#a9c4eb', '#6f9fdd', '#3f7fcf', '#1f5fbf', '#123a75', '#2e7d32'];
+  // What an item is waiting on in each Stage (see Stage in CONTEXT.md).
+  const STAGE_NAMES = {
+    kc: 'อยู่ระหว่างจัดทำ คฉ.',
+    stepPlan: 'คฉ. อนุมัติ/จัดทำแผนจัดหา',
+    stepApproved: 'อนุมัติแผนจัดหา/ดำเนินกรรมวิธี',
+    stepCommit: 'อนุมัติซื้อ/รอผูกพัน',
+    stepLedger: 'ผูกพันแล้ว/รอส่งของ',
+    done: 'ขึ้นบัญชีคุม',
+  };
+  // Fixed step names: the sheet's header over these columns can be a merged group title or blank.
+  const STAGE_COLUMN_NAMES = { kc: 'คฉ.', stepPlan: 'แผนจัดหา', stepApproved: 'อนุมัติ ซื้อ/จ้าง', stepCommit: 'ผูกพัน', stepLedger: 'ขึ้นบัญชีคุม' };
+  const SLICE_LABEL_MIN = 4; // percent; smaller slices are too thin to hold a number
   const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 
   const app = document.getElementById('app');
@@ -202,7 +215,7 @@
 
   // Donut of stroked circles: circumference 100, so each dash length is the slice's percent.
   function stageChart(items) {
-    const { stages, labels } = state.list;
+    const { stages } = state.list;
     const selected = state.filters.stage;
     const total = items.length;
     const counts = stages.map(key => items.filter(item => item.stage === key).length);
@@ -212,13 +225,17 @@
     const slices = stages.map((key, i) => {
       const size = percent(counts[i]);
       const offset = 25 - start; // start at 12 o'clock
+      const angle = (start + size / 2) / 100 * 2 * Math.PI - Math.PI / 2;
       start += size;
-      return size ? `<circle class="slice${dim(key)}" data-stage="${key}" r="15.915" cx="21" cy="21" stroke="${STAGE_COLORS[i]}"
-        stroke-dasharray="${size} ${100 - size}" stroke-dashoffset="${offset}"><title>${esc(labels[key])}: ${counts[i]}</title></circle>` : '';
+      if (!size) return '';
+      const label = size >= SLICE_LABEL_MIN
+        ? `<text class="slice-label${i < 2 ? ' on-light' : ''}${dim(key)}" x="${21 + 15.915 * Math.cos(angle)}" y="${21 + 15.915 * Math.sin(angle)}">${counts[i]}</text>` : '';
+      return `<circle class="slice${dim(key)}" data-stage="${key}" r="15.915" cx="21" cy="21" stroke="${STAGE_COLORS[i]}"
+        stroke-dasharray="${size} ${100 - size}" stroke-dashoffset="${offset}"><title>${STAGE_NAMES[key]}: ${counts[i]}</title></circle>${label}`;
     });
     const legend = stages.map((key, i) => `
       <button type="button" class="legend${dim(key)}" data-stage="${key}" aria-pressed="${selected === key}">
-        <i style="background:${STAGE_COLORS[i]}"></i><span>${esc(labels[key])}</span>
+        <i style="background:${STAGE_COLORS[i]}"></i><span>${STAGE_NAMES[key]}</span>
         <strong>${counts[i].toLocaleString('th-TH')}</strong>
         <small class="muted">${Math.round(percent(counts[i]))}%</small>
       </button>`);
@@ -280,7 +297,7 @@
     }
     const kind = isDate(value) ? 'done' : isBlank(value) ? 'pending' : 'info';
     return `<li class="step ${kind}">
-      <span class="label">${esc(labels[key])}</span>
+      <span class="label">${esc(STAGE_COLUMN_NAMES[key] ?? labels[key])}</span>
       <span class="value">${isBlank(value) ? 'ยังไม่ดำเนินการ' : show(value)}</span>
     </li>`;
   }

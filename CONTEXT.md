@@ -29,11 +29,18 @@ Budget minus Approved Amount; only meaningful once an Approved Amount exists.
 The current state of a Procurement Item, chosen from a fixed set maintained in the sheet.
 
 **Procurement Step**:
-One stage of the procurement process (แผนจัดหา through ขึ้นบัญชีคุม); a Procurement Item has reached a step when that step's date is filled in.
+One stage of the procurement process (คฉ. through ขึ้นบัญชีคุม); a Procurement Item has reached a step when that step's date is filled in.
 _Avoid_: Milestone, phase
 
 **Stage**:
-The step a Procurement Item is currently working on, out of คฉ. (คุณลักษณะเฉพาะ, writing the spec) → แผนจัดหา → อนุมัติ ซื้อ/จ้าง → ผูกพัน → ขึ้นบัญชีคุม. A date in one of these columns means that step is finished (any other text counts as empty), so the Stage is the step after the furthest dated one, even if an earlier date is empty; an item with no dates is in คฉ., and an item with a ขึ้นบัญชีคุม date stays in ขึ้นบัญชีคุม. Distinct from Status, which is maintained by hand in the sheet.
+What a Procurement Item is currently waiting on, read from its คฉ. → แผนจัดหา → อนุมัติ ซื้อ/จ้าง → ผูกพัน → ขึ้นบัญชีคุม dates. A date means that step is finished (any other text counts as empty), and the furthest dated step decides even if an earlier date is empty:
+- no dates: อยู่ระหว่างจัดทำ คฉ.
+- furthest is คฉ.: คฉ. อนุมัติ/จัดทำแผนจัดหา
+- furthest is แผนจัดหา: อนุมัติแผนจัดหา/ดำเนินกรรมวิธี
+- furthest is อนุมัติ ซื้อ/จ้าง: อนุมัติซื้อ/รอผูกพัน
+- furthest is ผูกพัน: ผูกพันแล้ว/รอส่งของ
+- ขึ้นบัญชีคุม dated: ขึ้นบัญชีคุม (completed)
+Distinct from Status, which is maintained by hand in the sheet.
 _Avoid_: Status, progress
 
 **Delivery Deadline** (ส่งมอบภายใน):

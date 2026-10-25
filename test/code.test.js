@@ -95,7 +95,7 @@ test('record flags: approved needs a W date; overdue needs a past Z date and emp
   assert.ok(!gs.toRecord(daysText, 7, '2030-01-01').isOverdue);
 });
 
-test('Stage is the step after the furthest dated one, ending at ขึ้นบัญชีคุม', () => {
+test('Stage is the step after the furthest dated one; a ขึ้นบัญชีคุม date means done', () => {
   const stageWith = dates => {
     const cells = blankRow();
     cells[col('code')] = '70SA0010';
@@ -107,7 +107,7 @@ test('Stage is the step after the furthest dated one, ending at ขึ้นบ�
   assert.strictEqual(stageWith({ kc: '01/02/2568', stepPlan: '05/02/2568' }), 'stepApproved');
   assert.strictEqual(stageWith({ kc: new Date(2025, 0, 1), stepApproved: new Date(2025, 2, 1) }), 'stepCommit', 'gap: furthest date wins');
   assert.strictEqual(stageWith({ stepCommit: new Date(2025, 3, 1) }), 'stepLedger');
-  assert.strictEqual(stageWith({ stepLedger: new Date(2025, 4, 1) }), 'stepLedger', 'completed stays in ขึ้นบัญชีคุม');
+  assert.strictEqual(stageWith({ stepLedger: new Date(2025, 4, 1) }), 'done', 'ledgered is completed');
   assert.strictEqual(stageWith({ kc: 'รอ', stepPlan: '-' }), 'kc', 'text is not a date');
 });
 
