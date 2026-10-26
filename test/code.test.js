@@ -126,6 +126,7 @@ test('Stuck: next step of คฉ.→อนุมัติ ซื้อ/จ้า
 
   const published = { kc: new Date(2025, 0, 1), stepPlan: new Date(2025, 0, 2), stepPublish: new Date(2025, 0, 5) };
   assert.strictEqual(recordWith(published, '2025-01-20').waitingFor, 'stepTor');
+  assert.strictEqual(recordWith(published, '2025-01-20').lastStep, 'stepPublish');
   assert.ok(recordWith(published, '2025-01-20').isStuck);
 
   const gap = { kc: new Date(2025, 0, 1), stepTor: new Date(2025, 0, 5) };
@@ -136,6 +137,7 @@ test('Stuck: next step of คฉ.→อนุมัติ ซื้อ/จ้า
   const approved = recordWith({ ...published, stepApproved: new Date(2025, 0, 6) }, '2030-01-01');
   assert.ok(!approved.isStuck, 'approved: no longer watched');
   assert.strictEqual(approved.waitingFor, null);
+  assert.strictEqual(recordWith({}, '2030-01-01').lastStep, null);
 });
 
 test('duplicate Item Codes are reported once each', () => {

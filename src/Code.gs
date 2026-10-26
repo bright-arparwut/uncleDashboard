@@ -193,13 +193,13 @@ function stageOf(record) {
   return lastDone === STAGES.length - 1 ? STAGE_DONE : STAGES[lastDone + 1];
 }
 
-// Waiting on the step after the furthest dated one, since that date.
+// Done up to the furthest dated step (lastStep) and waiting on the next one since that date.
 // No dates: nothing to count from; the last step dated: no longer watched.
 function stuckOf(record, todayIso) {
   const lastDone = lastDoneIndex(record, STUCK_STEPS);
-  if (lastDone < 0 || lastDone === STUCK_STEPS.length - 1) return { waitingFor: null, waitingDays: null, isStuck: false };
+  if (lastDone < 0 || lastDone === STUCK_STEPS.length - 1) return { lastStep: null, waitingFor: null, waitingDays: null, isStuck: false };
   const waitingDays = daysBetween(record[STUCK_STEPS[lastDone]], todayIso);
-  return { waitingFor: STUCK_STEPS[lastDone + 1], waitingDays, isStuck: waitingDays > STUCK_DAYS };
+  return { lastStep: STUCK_STEPS[lastDone], waitingFor: STUCK_STEPS[lastDone + 1], waitingDays, isStuck: waitingDays > STUCK_DAYS };
 }
 
 // Both are YYYY-MM-DD, parsed as UTC midnight, so no time-zone drift.

@@ -75,13 +75,16 @@
 
   const overdueBadge = item => item.isOverdue ? ' <span class="badge danger">เกินกำหนด</span>' : '';
   const stepName = (key, labels) => STEP_NAMES[key] ?? labels[key];
-  // Where an item is on the คฉ.→อนุมัติ ซื้อ/จ้าง chain watched for Stuck, and for how long.
-  function waitingText(item, labels) {
-    if (item.waitingFor) return `${stepName(item.waitingFor, labels)} · ทำมาแล้ว ${item.waitingDays} วัน`;
-    return isDate(item.stepApproved) ? `${stepName('stepApproved', labels)}แล้ว` : stepName('kc', labels);
+  // Where an item is on the คฉ.→อนุมัติ ซื้อ/จ้าง chain: days since its last dated step, and the step it waits on.
+  function stepBadge(item, labels) {
+    const badge = (tone, text) => `<span class="badge ${tone}">${esc(text)}</span>`;
+    const waiting = key => badge('next', `กำลังรอ ${stepName(key, labels)}`);
+    if (item.lastStep) {
+      const done = `${stepName(item.lastStep, labels)} · ทำมาแล้ว ${item.waitingDays} วัน`;
+      return badge(item.isStuck ? 'warn' : 'waiting', done) + ' ' + waiting(item.waitingFor);
+    }
+    return isDate(item.stepApproved) ? badge('waiting', `${stepName('stepApproved', labels)}แล้ว`) : waiting('kc');
   }
-  const stepBadge = (item, labels) =>
-    `<span class="badge ${item.isStuck ? 'warn' : 'waiting'}">${esc(waitingText(item, labels))}</span>`;
   const stuckBadge = (item, labels) => item.isStuck ? ' ' + stepBadge(item, labels) : '';
 
   function distinct(items, key) {
