@@ -5,7 +5,8 @@
     'stepApprovalRequest', 'stepApproved', 'stepDisburse', 'stepCommit', 'deliveryDeadline', 'stepLedger',
   ];
   const CLASSIFICATION = ['unit', 'project', 'type', 'plan', 'station', 'group', 'method', 'authority'];
-  const LIST_COLUMNS = ['code', 'name', 'budget', 'status', 'station'];
+  const LIST_COLUMNS = ['code', 'name', 'budget', 'step', 'station'];
+  const LIST_HEADERS = { step: 'ขั้นตอน' }; // not a sheet column: the Stuck chain position
   const STATUS_COLORS = 8;
   // Light to dark along the process, so the Stage order reads at a glance.
   // Light to dark blue while in progress, green once done.
@@ -69,8 +70,14 @@
 
   const overdueBadge = item => item.isOverdue ? ' <span class="badge danger">เกินกำหนด</span>' : '';
   const stepName = (key, labels) => STAGE_COLUMN_NAMES[key] ?? labels[key];
-  const stuckBadge = (item, labels) => item.isStuck
-    ? ` <span class="badge warn">รอ ${esc(stepName(item.waitingFor, labels))} ${item.waitingDays} วัน</span>` : '';
+  // Where an item is on the คฉ.→อนุมัติ ซื้อ/จ้าง chain watched for Stuck, and for how long.
+  function waitingText(item, labels) {
+    if (item.waitingFor) return `${stepName(item.waitingFor, labels)} · ทำมาแล้ว ${item.waitingDays} วัน`;
+    return isDate(item.stepApproved) ? `${stepName('stepApproved', labels)}แล้ว` : stepName('kc', labels);
+  }
+  const stepBadge = (item, labels) =>
+    `<span class="badge ${item.isStuck ? 'warn' : 'waiting'}">${esc(waitingText(item, labels))}</span>`;
+  const stuckBadge = (item, labels) => item.isStuck ? ' ' + stepBadge(item, labels) : '';
 
   function distinct(items, key) {
     const values = items.map(i => i[key]).filter(v => !isBlank(v)).map(String);
@@ -197,13 +204,13 @@
   function itemList(items, empty) {
     const { labels, duplicateCodes } = state.list;
     if (!items.length) return `<p class="muted">${empty}</p>`;
-    const head = `<div class="row head">${LIST_COLUMNS.map(k => `<span>${esc(labels[k])}</span>`).join('')}</div>`;
+    const head = `<div class="row head">${LIST_COLUMNS.map(k => `<span>${esc(LIST_HEADERS[k] ?? labels[k])}</span>`).join('')}</div>`;
     return head + items.map(item => `
       <button type="button" class="row" data-code="${esc(item.code)}">
         <span class="code">${esc(item.code)}${duplicateCodes.includes(item.code) ? ' <span class="badge warn">รหัสซ้ำ</span>' : ''}</span>
         <span class="name">${show(item.name)}</span>
         <span class="budget">${money(item.budget)}</span>
-        <span>${statusBadge(item.status)}${overdueBadge(item)}${stuckBadge(item, labels)}</span>
+        <span>${stepBadge(item, labels)}${overdueBadge(item)}</span>
         <span class="station">${show(item.station)}</span>
       </button>`).join('');
   }
