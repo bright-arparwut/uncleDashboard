@@ -26,7 +26,7 @@
 
   const app = document.getElementById('app');
   const yearSelect = document.getElementById('year');
-  const emptyFilters = () => ({ year: '', q: '', unit: '', project: '', type: '', group: '', status: '', stage: '', overdueOnly: false });
+  const emptyFilters = () => ({ year: '', q: '', unit: '', project: '', type: '', group: '', status: '', stage: '' });
   let state = { list: null, filters: emptyFilters() };
 
   // ---- helpers ----
@@ -68,6 +68,9 @@
   }
 
   const overdueBadge = item => item.isOverdue ? ' <span class="badge danger">เกินกำหนด</span>' : '';
+  const stepName = (key, labels) => STAGE_COLUMN_NAMES[key] ?? labels[key];
+  const stuckBadge = (item, labels) => item.isStuck
+    ? ` <span class="badge warn">รอ ${esc(stepName(item.waitingFor, labels))} ${item.waitingDays} วัน</span>` : '';
 
   function distinct(items, key) {
     const values = items.map(i => i[key]).filter(v => !isBlank(v)).map(String);
@@ -148,22 +151,27 @@
         ${filterSelect('status', labels.status, distinct(items, 'status'), f.status)}
       </div>
       <p id="count" class="count muted"></p>
-      <div id="items" class="list"></div>`);
+      <div id="items" class="list"></div>
+      <h2 id="stuck-title" class="section-title"></h2>
+      <div id="stuck" class="list"></div>
+      <h2 id="overdue-title" class="section-title"></h2>
+      <div id="overdue" class="list"></div>`);
 
     app.querySelectorAll('[data-filter]').forEach(input => {
       input.addEventListener('input', () => setFilter(input.dataset.filter, input.value));
     });
     app.querySelector('#summary').addEventListener('click', e => {
-      if (e.target.closest('[data-overdue]')) setFilter('overdueOnly', !state.filters.overdueOnly);
+      const card = e.target.closest('[data-jump]');
+      if (card) app.querySelector(`#${card.dataset.jump}-title`).scrollIntoView({ behavior: 'smooth' });
     });
     app.querySelector('#stages').addEventListener('click', e => {
       const slice = e.target.closest('[data-stage]');
       if (slice) setFilter('stage', state.filters.stage === slice.dataset.stage ? '' : slice.dataset.stage);
     });
-    app.querySelector('#items').addEventListener('click', e => {
+    app.querySelectorAll('.list').forEach(list => list.addEventListener('click', e => {
       const row = e.target.closest('[data-code]');
       if (row) go({ item: row.dataset.code });
-    });
+    }));
   }
 
   function setFilter(key, value) {
@@ -176,41 +184,58 @@
     const same = key => !f[key] || String(item[key] ?? '') === f[key];
     return (!q || (item.code + ' ' + (item.name ?? '')).toLowerCase().includes(q))
       && (!f.year || String(item.fiscalYear) === f.year)
-      && same('unit') && same('project') && same('type') && same('group') && same('status') && same('stage')
-      && (!f.overdueOnly || item.isOverdue);
+      && same('unit') && same('project') && same('type') && same('group') && same('status') && same('stage');
+  }
+
+  // A KPI card that scrolls to its section below the list; the count takes the tone colour when non-zero.
+  function jumpCard(section, label, count, tone) {
+    return `<button type="button" data-jump="${section}" class="kpi ${tone}${count ? ' has' : ''}">
+      <span>${label}</span><strong>${count.toLocaleString('th-TH')}</strong>
+    </button>`;
+  }
+
+  function itemList(items, empty) {
+    const { labels, duplicateCodes } = state.list;
+    if (!items.length) return `<p class="muted">${empty}</p>`;
+    const head = `<div class="row head">${LIST_COLUMNS.map(k => `<span>${esc(labels[k])}</span>`).join('')}</div>`;
+    return head + items.map(item => `
+      <button type="button" class="row" data-code="${esc(item.code)}">
+        <span class="code">${esc(item.code)}${duplicateCodes.includes(item.code) ? ' <span class="badge warn">รหัสซ้ำ</span>' : ''}</span>
+        <span class="name">${show(item.name)}</span>
+        <span class="budget">${money(item.budget)}</span>
+        <span>${statusBadge(item.status)}${overdueBadge(item)}${stuckBadge(item, labels)}</span>
+        <span class="station">${show(item.station)}</span>
+      </button>`).join('');
   }
 
   function renderListBody() {
-    const { items, labels, duplicateCodes } = state.list;
+    const { items } = state.list;
     const f = state.filters;
     const inYear = items.filter(item => !f.year || String(item.fiscalYear) === f.year);
     const shown = items.filter(item => matches(item, f));
     const budget = shown.reduce((sum, item) => sum + (toNumber(item.budget) || 0), 0);
-    const overdue = shown.filter(item => item.isOverdue).length;
+    const stuck = shown.filter(i => i.isStuck).sort((a, b) => b.waitingDays - a.waitingDays);
+    const overdue = shown.filter(i => i.isOverdue).sort((a, b) => a.deliveryDeadline.localeCompare(b.deliveryDeadline));
 
     app.querySelector('#summary').innerHTML = `
       <div class="kpi"><span>จำนวนรายการ</span><strong>${shown.length.toLocaleString('th-TH')}</strong></div>
       <div class="kpi"><span>วงเงินรวม</span><strong>${millions(budget)}</strong></div>
       <div class="kpi"><span>อนุมัติแล้ว</span><strong>${shown.filter(i => i.isApproved).length.toLocaleString('th-TH')}</strong></div>
-      <button type="button" data-overdue class="kpi${overdue ? ' alert' : ''}${f.overdueOnly ? ' active' : ''}" aria-pressed="${f.overdueOnly}">
-        <span>เกินกำหนด${f.overdueOnly ? ' (แตะเพื่อดูทั้งหมด)' : ''}</span><strong>${overdue.toLocaleString('th-TH')}</strong>
-      </button>`;
+      ${jumpCard('overdue', 'เกินกำหนด', overdue.length, 'danger')}
+      ${jumpCard('stuck', 'ค้างเกิน 10 วัน', stuck.length, 'warn')}`;
 
     // The chart ignores its own Stage filter, so the other slices stay visible around the selected one.
     app.querySelector('#stages').innerHTML = stageChart(items.filter(item => matches(item, { ...f, stage: '' })));
 
     app.querySelector('#count').textContent = `แสดง ${shown.length} จาก ${inYear.length} รายการ`;
 
-    const head = `<div class="row head">${LIST_COLUMNS.map(k => `<span>${esc(labels[k])}</span>`).join('')}</div>`;
-    const rows = shown.map(item => `
-      <button type="button" class="row" data-code="${esc(item.code)}">
-        <span class="code">${esc(item.code)}${duplicateCodes.includes(item.code) ? ' <span class="badge warn">รหัสซ้ำ</span>' : ''}</span>
-        <span class="name">${show(item.name)}</span>
-        <span class="budget">${money(item.budget)}</span>
-        <span>${statusBadge(item.status)}${overdueBadge(item)}</span>
-        <span class="station">${show(item.station)}</span>
-      </button>`);
-    app.querySelector('#items').innerHTML = shown.length ? head + rows.join('') : '<p class="muted">ไม่พบรายการ</p>';
+    app.querySelector('#items').innerHTML = itemList(shown, 'ไม่พบรายการ');
+
+    // Always shown below the list, longest-waiting first, so nobody has to go looking for them.
+    app.querySelector('#stuck-title').textContent = `ค้างเกิน 10 วัน (${stuck.length})`;
+    app.querySelector('#stuck').innerHTML = itemList(stuck, 'ไม่มีรายการค้าง');
+    app.querySelector('#overdue-title').textContent = `เกินกำหนดส่งมอบ (${overdue.length})`;
+    app.querySelector('#overdue').innerHTML = itemList(overdue, 'ไม่มีรายการเกินกำหนด');
   }
 
   // Donut of stroked circles: circumference 100, so each dash length is the slice's percent.
@@ -297,7 +322,7 @@
     }
     const kind = isDate(value) ? 'done' : isBlank(value) ? 'pending' : 'info';
     return `<li class="step ${kind}">
-      <span class="label">${esc(STAGE_COLUMN_NAMES[key] ?? labels[key])}</span>
+      <span class="label">${esc(stepName(key, labels))}</span>
       <span class="value">${isBlank(value) ? 'ยังไม่ดำเนินการ' : show(value)}</span>
     </li>`;
   }
@@ -311,7 +336,7 @@
       <section class="card">
         <p class="muted">${esc(labels.code)} ${esc(item.code)}${year}</p>
         <h1>${show(item.name)}</h1>
-        <p>${statusBadge(item.status)}${overdueBadge(item)}</p>
+        <p>${statusBadge(item.status)}${overdueBadge(item)}${stuckBadge(item, labels)}</p>
       </section>
       ${moneyCard(labels, item)}
       <section class="card">

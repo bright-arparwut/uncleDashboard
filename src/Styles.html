@@ -19,8 +19,9 @@
   .kpi span { display: block; color: var(--muted); font-size: 14px; }
   .kpi strong { font-size: 22px; }
   button.kpi { cursor: pointer; }
-  .kpi.alert strong { color: var(--danger); }
-  .kpi.active { border-color: var(--danger); box-shadow: inset 0 0 0 2px var(--danger); }
+  .kpi.danger { --tone: var(--danger); }
+  .kpi.warn { --tone: var(--warn); }
+  .kpi.has strong { color: var(--tone); }
 
   /* Stage donut */
   .stage-body { display: grid; gap: 12px; align-items: center; }
@@ -43,6 +44,7 @@
   .filters { display: grid; gap: 8px; margin-bottom: 8px; }
   .filters input, .filters select { font: inherit; padding: 10px; border: 1px solid var(--line); border-radius: 8px; background: #fff; width: 100%; }
   .count { margin: 0 0 8px; font-size: 14px; }
+  .section-title { font-size: 18px; margin: 24px 0 8px; scroll-margin-top: 60px; }
 
   /* List: cards on phone/tablet, table rows on wide screens */
   .list { display: grid; gap: 8px; }
@@ -95,7 +97,7 @@
   .btn { display: inline-block; text-align: center; padding: 10px 14px; border-radius: 8px; background: var(--accent); color: #fff; text-decoration: none; border: 0; font: inherit; cursor: pointer; }
 
   @media (min-width: 900px) {
-    .cards { grid-template-columns: repeat(4, 1fr); }
+    .cards { grid-template-columns: repeat(5, 1fr); }
     .filters { grid-template-columns: repeat(3, 1fr); }
     .stage-body { grid-template-columns: 220px 1fr; }
     .donut { width: 200px; height: 200px; }

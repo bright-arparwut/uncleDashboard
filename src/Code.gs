@@ -28,6 +28,11 @@ const NAME_INDEX = FIELDS.indexOf('name');
 // Stage columns in process order (see Stage in CONTEXT.md).
 const STAGES = ['kc', 'stepPlan', 'stepApproved', 'stepCommit', 'stepLedger'];
 const STAGE_DONE = 'done'; // every Stage column finished
+// Steps watched for Stuck, in order; once อนุมัติ ซื้อ/จ้าง is dated the item is no longer watched.
+const STUCK_STEPS = ['kc', 'stepPlan', 'stepPublish', 'stepTor', 'stepMedianPrice', 'stepPurchaseReport',
+  'stepBidOpen', 'stepApprovalRequest', 'stepApproved'];
+const STUCK_DAYS = 10; // next step still empty longer than this is Stuck
+const MS_PER_DAY = 24 * 60 * 60 * 1000;
 
 function doGet() {
   const page = HtmlService.createTemplateFromFile('Index');
@@ -173,13 +178,33 @@ function toRecord(cells, row, todayIso) {
     isApproved: isIsoDate(record.stepApproved),
     isOverdue: isIsoDate(record.deliveryDeadline) && record.deliveryDeadline < todayIso && record.stepLedger === null,
     stage: stageOf(record),
+    ...stuckOf(record, todayIso),
   };
 }
 
-// A date means that step is finished, so the Stage is the step after the furthest dated one.
+// A date means that step is finished; the furthest dated step counts even if an earlier one is empty.
+function lastDoneIndex(record, steps) {
+  return steps.map(key => isIsoDate(record[key])).lastIndexOf(true);
+}
+
+// The Stage is the step after the furthest dated one.
 function stageOf(record) {
-  const lastDone = STAGES.map(key => isIsoDate(record[key])).lastIndexOf(true);
+  const lastDone = lastDoneIndex(record, STAGES);
   return lastDone === STAGES.length - 1 ? STAGE_DONE : STAGES[lastDone + 1];
+}
+
+// Waiting on the step after the furthest dated one, since that date.
+// No dates: nothing to count from; the last step dated: no longer watched.
+function stuckOf(record, todayIso) {
+  const lastDone = lastDoneIndex(record, STUCK_STEPS);
+  if (lastDone < 0 || lastDone === STUCK_STEPS.length - 1) return { waitingFor: null, waitingDays: null, isStuck: false };
+  const waitingDays = daysBetween(record[STUCK_STEPS[lastDone]], todayIso);
+  return { waitingFor: STUCK_STEPS[lastDone + 1], waitingDays, isStuck: waitingDays > STUCK_DAYS };
+}
+
+// Both are YYYY-MM-DD, parsed as UTC midnight, so no time-zone drift.
+function daysBetween(fromIso, toIso) {
+  return Math.round((Date.parse(toIso) - Date.parse(fromIso)) / MS_PER_DAY);
 }
 
 function findDuplicateCodes(records) {

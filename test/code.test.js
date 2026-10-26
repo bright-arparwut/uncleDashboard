@@ -111,6 +111,33 @@ test('Stage is the step after the furthest dated one; a ขึ้นบัญช
   assert.strictEqual(stageWith({ kc: 'รอ', stepPlan: '-' }), 'kc', 'text is not a date');
 });
 
+test('Stuck: next step of คฉ.→อนุมัติ ซื้อ/จ้าง still empty more than 10 days after the furthest dated one', () => {
+  const recordWith = (dates, today) => {
+    const cells = blankRow();
+    cells[col('code')] = '70SA0010';
+    Object.entries(dates).forEach(([key, value]) => { cells[col(key)] = value; });
+    return gs.toRecord(cells, 7, today);
+  };
+  const kcOnly = { kc: new Date(2025, 0, 5) };
+  assert.strictEqual(recordWith(kcOnly, '2025-01-15').waitingFor, 'stepPlan');
+  assert.strictEqual(recordWith(kcOnly, '2025-01-15').waitingDays, 10);
+  assert.ok(!recordWith(kcOnly, '2025-01-15').isStuck, 'exactly 10 days is not stuck');
+  assert.ok(recordWith(kcOnly, '2025-01-16').isStuck);
+
+  const published = { kc: new Date(2025, 0, 1), stepPlan: new Date(2025, 0, 2), stepPublish: new Date(2025, 0, 5) };
+  assert.strictEqual(recordWith(published, '2025-01-20').waitingFor, 'stepTor');
+  assert.ok(recordWith(published, '2025-01-20').isStuck);
+
+  const gap = { kc: new Date(2025, 0, 1), stepTor: new Date(2025, 0, 5) };
+  assert.strictEqual(recordWith(gap, '2025-01-20').waitingFor, 'stepMedianPrice', 'furthest dated step wins');
+
+  assert.ok(!recordWith({}, '2030-01-01').isStuck, 'no dates: nothing to count from');
+  assert.strictEqual(recordWith({}, '2030-01-01').waitingDays, null);
+  const approved = recordWith({ ...published, stepApproved: new Date(2025, 0, 6) }, '2030-01-01');
+  assert.ok(!approved.isStuck, 'approved: no longer watched');
+  assert.strictEqual(approved.waitingFor, null);
+});
+
 test('duplicate Item Codes are reported once each', () => {
   const records = [{ code: '1' }, { code: '2' }, { code: '1' }, { code: '' }, { code: '' }];
   assert.deepStrictEqual([...gs.findDuplicateCodes(records)], ['1']);

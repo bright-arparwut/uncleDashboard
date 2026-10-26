@@ -52,3 +52,7 @@ A Procurement Item whose อนุมัติ ซื้อ/จ้าง step ha
 
 **Overdue** (เกินกำหนด):
 A Procurement Item whose Delivery Deadline has passed while ขึ้นบัญชีคุม is still empty.
+
+**Stuck** (ค้าง):
+A Procurement Item whose next step has stayed empty for more than 10 days after its furthest dated step, along คฉ. → แผนจัดหา → เผยแพร่แผน → TOR → ราคากลาง → รายงานขอซื้อ → วันที่เปิดซอง → ขออนุมัติ ซื้อ/จ้าง → อนุมัติ ซื้อ/จ้าง (e.g. เผยแพร่แผน dated 1 Oct, TOR still empty on 12 Oct). An item with none of these dates, or with อนุมัติ ซื้อ/จ้าง dated, is never Stuck. Tracked separately from Stage.
+_Avoid_: Delayed, late (those suggest Overdue)
