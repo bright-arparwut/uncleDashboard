@@ -80,7 +80,7 @@
     const badge = (tone, text) => `<span class="badge ${tone}">${esc(text)}</span>`;
     const waiting = key => badge('next', `กำลังรอ ${stepName(key, labels)}`);
     if (item.lastStep) {
-      const done = `${stepName(item.lastStep, labels)} · ทำมาแล้ว ${item.waitingDays} วัน`;
+      const done = `${stepName(item.lastStep, labels)} · อนุมัติแล้ว ${item.waitingDays} วัน`;
       return badge(item.isStuck ? 'warn' : 'waiting', done) + ' ' + waiting(item.waitingFor);
     }
     return isDate(item.stepApproved) ? badge('waiting', `${stepName('stepApproved', labels)}แล้ว`) : waiting('kc');
