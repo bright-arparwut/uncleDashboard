@@ -20,8 +20,13 @@
     stepLedger: 'ผูกพันแล้ว/รอส่งของ',
     done: 'ขึ้นบัญชีคุม',
   };
-  // Fixed step names: the sheet's header over these columns can be a merged group title or blank.
-  const STAGE_COLUMN_NAMES = { kc: 'คฉ.', stepPlan: 'แผนจัดหา', stepApproved: 'อนุมัติ ซื้อ/จ้าง', stepCommit: 'ผูกพัน', stepLedger: 'ขึ้นบัญชีคุม' };
+  // Fixed step names: the sheet's header row over the step columns holds merged group titles or blanks.
+  const STEP_NAMES = {
+    kc: 'คฉ.', stepPlan: 'แผนจัดหา', stepPublish: 'เผยแพร่แผน', stepTor: 'TOR', stepMedianPrice: 'ราคากลาง',
+    stepPurchaseReport: 'รายงานขอซื้อ', stepBidOpen: 'วันที่เปิดซอง', stepApprovalRequest: 'ขออนุมัติ ซื้อ/จ้าง',
+    stepApproved: 'อนุมัติ ซื้อ/จ้าง', stepDisburse: 'สั่งจ่าย งป.', stepCommit: 'ผูกพัน',
+    deliveryDeadline: 'ส่งมอบภายใน', stepLedger: 'ขึ้นบัญชีคุม',
+  };
   const SLICE_LABEL_MIN = 4; // percent; smaller slices are too thin to hold a number
   const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -69,7 +74,7 @@
   }
 
   const overdueBadge = item => item.isOverdue ? ' <span class="badge danger">เกินกำหนด</span>' : '';
-  const stepName = (key, labels) => STAGE_COLUMN_NAMES[key] ?? labels[key];
+  const stepName = (key, labels) => STEP_NAMES[key] ?? labels[key];
   // Where an item is on the คฉ.→อนุมัติ ซื้อ/จ้าง chain watched for Stuck, and for how long.
   function waitingText(item, labels) {
     if (item.waitingFor) return `${stepName(item.waitingFor, labels)} · ทำมาแล้ว ${item.waitingDays} วัน`;
@@ -323,7 +328,7 @@
     const value = item[key];
     if (key === 'deliveryDeadline') {
       return `<li class="step deadline${item.isOverdue ? ' overdue' : ''}">
-        <span class="label">กำหนดส่งมอบ <small class="muted">(${esc(labels[key])})</small></span>
+        <span class="label">กำหนดส่งมอบ <small class="muted">(${esc(stepName(key, labels))})</small></span>
         <span class="value">${show(value)}${item.isOverdue ? ' · เกินกำหนด' : ''}</span>
       </li>`;
     }

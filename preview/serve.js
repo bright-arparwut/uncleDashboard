@@ -10,11 +10,11 @@ const PORT = 8080;
 const SRC = path.join(__dirname, '../src');
 const read = name => fs.readFileSync(path.join(SRC, name), 'utf8');
 
-// Stage headers as the real sheet shows them: a merged group title over คฉ., blanks elsewhere.
+// Step headers as the real sheet's header row shows them: merged group titles and blanks.
 const HEADER = ['หน่วย', 'กลุ่มงาน/โครงการ', 'รหัสรายการ', 'ประเภทงาน', 'แผนงาน', 'สถาน คฉ.', 'กลุ่มงาน (หัวข้อหลัก-ย่อย)', 'รายการ',
   'วงเงิน', 'สถานะ', 'รายละเอียด (สรุปการดำเนินการ)', 'วงเงินอนุมัติซื้อ/จ้าง', 'วีธีจัดหา', 'อำนาจอนุมัติ', 'ดำเนินการจัดทำแผน',
-  '', 'เผยแพร่แผน', 'TOR', 'ราคากลาง', 'รายงานขอซื้อ', 'วันที่เปิดซอง', 'ขออนุมัติ ซื้อ/จ้าง',
-  '', 'สั่งจ่าย งป.', '', 'ส่งมอบภายใน', 'ขึ้นบัญชีคุม', 'หมายเหตุ'];
+  '', 'การดำเนินกรรมวิธีจัดหา', '', '', '', '', '',
+  '', '', '', '', 'ขึ้นบัญชีคุม', 'หมายเหตุ'];
 
 // [name, budget, status, { field: date text (Buddhist era) }]
 const MOCK = [
